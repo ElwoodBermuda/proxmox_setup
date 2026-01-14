@@ -1,0 +1,37 @@
+---
+- name: List all existing virtual machines on node
+  hosts: localhost
+  tasks:
+    - name: list vms
+      community.proxmox.proxmox_vm_info:
+        api_host: proxmox-07.stahlin.lan
+        api_user: root@pam
+        api_token_id: 'root@pam!ansible_token'
+        api_token_secret: '7c02ed27-a70c-46ed-802e-20156628fe25'
+        node: node01
+
+
+# ---
+# - hosts: localhost  # Modules like this are often delegated to run on localhost
+#   connection: local
+#   gather_facts: false
+#   tasks:
+#     - name: List all existing virtual machines on node
+#       community.proxmox.proxmox_vm_info:
+#         api_host: proxmoxhost
+#         api_user: root@pam
+#         api_token_id: '{{ token_id | default(omit) }}'
+#         api_token_secret: '{{ token_secret | default(omit) }}'
+#         node: proxmox-07
+
+
+#     - name: Get Proxmox VM info
+#       community.proxmox.proxmox_vm_info:
+#         api_host: your_proxmox_host
+#         api_user: root@pam
+#         # ... other parameters ...
+#       register: vm_info_result
+
+#     - name: Debug VM information
+#       ansible.builtin.debug:
+#         var: vm_info_result

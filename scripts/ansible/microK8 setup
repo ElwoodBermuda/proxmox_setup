@@ -1,0 +1,52 @@
+# microK8 setup
+
+
+# microk8s install
+sudo snap install microk8s --classic	
+
+
+# join the current user to the microk8s group 
+```
+	sudo usermod -a -G microk8s $USER
+	mkdir -p ~/.kube
+	chmod 0700 ~/.kube
+```
+
+# enable hostpath, ingress, and dashboard 
+
+microk8s enable ingress
+microk8s enable dashboard
+microk8s enable hostpath-storage
+microk8s enable cilium
+
+# enable Cillium
+#microk8s enable cilium
+
+
+
+# notes for install the nginx ingress in in the dashboard ingress file
+
+
+
+
+
+
+# troubleshooting
+
+
+## won't start
+
+- level=fatal msg="Failed to create server" error="failed to create dqlite app: listen to 192.168.25.92:19001: listen tcp 192.168.25.92:19001: bind: cannot assign requested address"
+ - if the IP address of the node changes the IP address in the backend config needs to changed to match the new IP address otherwise microk8s will have trouble connecting to the dqlite database
+ - file to update: /var/snap/microk8s/current/var/kubernetes/backend/info.yaml
+
+
+ 
+
+
+
+
+
+
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml

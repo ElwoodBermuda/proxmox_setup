@@ -1,0 +1,40 @@
+# This is based of the guide at
+# https://static.xtremeownage.com/blog/2024/proxmox---debian-cloud-init-templates/
+
+# The ID of the Template/VM.
+VM_ID=900
+
+# Desired proxmox storage for the new image.
+STORAGE="ceph_vm_u2"
+
+# Download Image
+wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2
+
+# Install tools to manage images
+apt-get install libguestfs-tools
+
+# Install packages
+virt-customize -a debian-12-genericcloud-amd64.qcow2 --install qemu-guest-agent,curl,wget,nano,rsync
+
+# set to use aptcacher-ng proxy address
+#virt-customize -a debian-12-genericcloud-amd64.qcow2 --run-command 'echo "Acquire::http::Proxy \"http://172.29.10.26:3124/\";" > /etc/apt/apt.conf.d/99-proxy.conf'
+
+# Set the DHCP client identifier to use hardware address.
+virt-customize -a debian-12-genericcloud-amd64.qcow2 --run-command "sed -i 's|send host-name = gethostname();|send dhcp-client-identifier = hardware;|' /etc/dhcp/dhclient.conf"
+
+# Reset Machine-ID
+virt-customize -a debian-12-genericcloud-amd64.qcow2 --run-command "echo -n > /etc/machine-id"
+
+# Compress the image
+qemu-img convert -O qcow2 -c -o preallocation=off debian-12-genericcloud-amd64.qcow2 debian-12-genericcloud-amd64-shrink.qcow2
+
+
+# Import the image to our template.
+qm importdisk $VM_ID debian-12-genericcloud-amd64-shrink.qcow2 $STORAGE
+
+qm clone 900 200 --name testclone --full
+qm start 200; qm terminal 200
+
+#qm destroy 200
+
+# https://salsa.debian.org/debian/auto-apt-proxy

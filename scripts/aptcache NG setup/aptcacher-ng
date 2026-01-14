@@ -1,0 +1,7 @@
+# aptcacher-ng
+https://github.com/tteck/Proxmox/discussions/2332
+https://blog.packagecloud.io/using-apt-cacher-ng-with-ssl-tls/
+
+
+# auto proxy 
+https://salsa.debian.org/debian/auto-apt-proxy

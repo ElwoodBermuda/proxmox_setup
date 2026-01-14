@@ -1,0 +1,112 @@
+---
+- name: Install and configure MicroK8s
+  hosts: microk8s
+  become: true # Run tasks with sudo
+  vars:
+    microk8s_user: kubeuser # Replace with your actual username
+    # Optional: specify a channel, e.g., '1.26/stable'
+    microk8s_channel: "latest/stable" 
+
+  tasks:
+    - name: Update apt cache (optional, depending on your setup)
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install MicroK8s via snap
+      community.general.snap: # The snap module is in the community.general collection
+        name: microk8s
+        classic: true
+        channel: "{{ microk8s_channel }}" # Uncomment to use a specific channel
+        state: present
+
+    - name: Add user to the microk8s group
+      ansible.builtin.user:
+        name: "{{ microk8s_user }}"
+        groups: microk8s
+        append: yes
+
+    - name: Ensure .kube directory permissions are correct
+      ansible.builtin.file:
+        path: /home/{{ microk8s_user }}/.kube
+        owner: "{{ microk8s_user }}"
+        group: microk8s
+        mode: '0700'
+        state: directory
+        # The next task will handle chown -f -R, which is safer after the directory is confirmed
+
+    - name: Change ownership of ~/.kube to the user
+      ansible.builtin.command: chown -f -R {{ microk8s_user }} /home/{{ microk8s_user }}/.kube
+      args:
+        # Prevents "changed" status if the ownership is already correct
+        creates: /home/{{ microk8s_user }}/.kube/config 
+
+    - name: Enable required MicroK8s add-ons (dns, storage, ingress)
+      ansible.builtin.command: microk8s enable {{ item }}
+      with_items:
+        - dns
+        - ingress
+        - cilium
+        - dashboard
+      register: enable_addons_result
+      changed_when: enable_addons_result.rc != 0
+      # Use `microk8s status --wait-ready` in a separate task or manual step after this to ensure
+      # all components are running before attempting to deploy K8s resources.
+
+    - name: Set an alias for kubectl
+      ansible.builtin.shell: echo "alias kubectl='microk8s.kubectl'" >> /home/{{ microk8s_user }}/.bash_aliases
+      args:
+        creates: /home/{{ microk8s_user }}/.bash_aliases # Prevents running command multiple times
+
+    - name: Wait for MicroK8s to be ready
+      ansible.builtin.command: microk8s status --wait-ready
+      changed_when: false # This command checks status and waits, doesn't change system state in Ansible's view
+
+
+    # # TODO: set the password for the user here
+    # # https://docs.ansible.com/ansible/latest/reference_appendices/faq.html#how-do-i-generate-encrypted-passwords-for-the-user-module
+    # - name: Add the user 'tyler' 
+    #   become: true
+    #   ansible.builtin.user:
+    #     name: tyler
+    #     shell: /bin/bash
+    #     append: yes
+    #     create_home: true
+    #     generate_ssh_key: true
+    #     groups: wheel, sudo
+    #     password: $6$E07OmrQ0YTNMssma$i2wXBTkwhPN1j1svqshyScB.Qa5l1G8M7hCPggzN5kvxrryoczR7xk0dZN307BGApquVaK8b9HkekRyrmEKgP/
+
+
+    # - name: Set authorized key without validating the TLS/SSL certificates
+    #   become: true
+    #   ansible.posix.authorized_key:
+    #     user: tyler
+    #     state: present
+    #     key: https://github.com/tylergasper.keys
+    #     validate_certs: false
+
+
+
+- name: Configure Master and Generate Join Command
+  hosts: master
+  become: true
+  tasks:
+    - name: Generate join token
+      command: microk8s add-node --format short
+      register: join_command_raw
+
+    - name: Set join command as a fact
+      set_fact:
+        join_command: "{{ join_command_raw.stdout_lines[0] }}"
+
+- name: Join Worker Nodes to Cluster
+  hosts: workers
+  become: true
+  tasks:
+    - name: Join the cluster
+      command: "{{ hostvars[groups['master'][0]]['join_command'] }}"
+      register: join_result
+      failed_when: 
+        - join_result.rc != 0 
+        - "'already part of a cluster' not in join_result.stderr"
+

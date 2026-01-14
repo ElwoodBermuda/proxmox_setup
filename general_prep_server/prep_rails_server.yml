@@ -1,0 +1,201 @@
+# --ask-become-pass is also an option so the become password is not hardcoded 
+# ansible-playbook -i ../hosts.yml prep_rails_server.yml --ask-become-pass --become-user tgasper
+# ansible-playbook -i ../hosts.yml prep_rails_server.yml --ask-become-pass --become-user root
+---
+- name: setup a server to host rails sites without docker
+  hosts: 127.0.0.1
+  connection: local
+  become_user: root
+
+  tasks:
+    # https://serverfault.com/questions/307407/ssh-allow-password-for-one-user-rest-only-allow-public-keys
+    - name: update openssh server config
+      become: true
+      block: 
+      - name: prevent passwordless login for all users
+        ansible.builtin.lineinfile:
+          path: /etc/ssh/sshd_config
+          regexp: '#PasswordAuthentication yes'
+          line: 'PasswordAuthentication no'
+
+
+      - name: disable empty passwords for all users
+        ansible.builtin.lineinfile:
+          path: /etc/ssh/sshd_config
+          regexp: '#PermitEmptyPasswords no'
+          line: 'PermitEmptyPasswords no'
+
+      - name: Stop and Start sshd service
+        become: true
+        service:
+          name: ssh
+          state: restarted
+
+
+    - name: setup firewall
+      become: true 
+      block: 
+        # remove all existing settings from firewall
+        - name: reset firewall to reject all
+          ufw:
+            state: reset
+
+        - name: enable firewall 
+          ufw:
+            state: enabled
+
+
+        - name: set logging
+          ufw:
+            logging: 'on'
+
+        - name: Allow all access to tcp port 22
+          ufw:
+            rule: allow
+            port: '22'
+            proto: tcp
+
+
+        - name: Allow all access to tcp port 80
+          ufw:
+            rule: allow
+            port: '80'
+            proto: tcp
+
+        - name: Allow all access to tcp port 443
+          ufw:
+            rule: allow
+            port: '443'
+            proto: tcp
+
+        - name: reload firewall 
+          ufw:
+            state: reloaded
+
+
+
+    - name: Update and upgrade apt packages
+      become: true
+      apt:
+        upgrade: yes
+        update_cache: yes
+
+
+    - name: install some packages that are handy
+      become: true
+      ansible.builtin.apt:
+        pkg:
+        - vim
+        - ncdu
+        - sshfs
+        - sl  # steam locomotive
+        - qemu-guest-agent # proxmox guest agent
+        - whois
+
+
+    - name: create the wheel group
+      become: true
+      ansible.builtin.group:
+        name: wheel
+        state: present
+
+    - name: Make users passwordless for sudo in group wheel
+      become: true
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^%wheel'
+        line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
+
+    # TODO: set the password for the user here
+    # https://docs.ansible.com/ansible/latest/reference_appendices/faq.html#how-do-i-generate-encrypted-passwords-for-the-user-module
+    - name: Add the user 'tyler' 
+      become: true
+      ansible.builtin.user:
+        name: tyler
+        shell: /bin/bash
+        append: yes
+        create_home: true
+        generate_ssh_key: true
+        groups: wheel, sudo
+        password: $6$E07OmrQ0YTNMssma$i2wXBTkwhPN1j1svqshyScB.Qa5l1G8M7hCPggzN5kvxrryoczR7xk0dZN307BGApquVaK8b9HkekRyrmEKgP/
+
+
+    - name: Set authorized key without validating the TLS/SSL certificates
+      become: true
+      ansible.posix.authorized_key:
+        user: tyler
+        state: present
+        key: https://github.com/tylergasper.keys
+        validate_certs: false
+
+
+    # - name: Add the user 'travis' 
+    #   become: true
+    #   ansible.builtin.user:
+    #     name: travis
+    #     shell: /bin/bash
+    #     append: yes
+    #     create_home: true
+    #     generate_ssh_key: true
+    #     groups: wheel, sudo
+    #     password: $6$E07OmrQ0YTNMssma$i2wXBTkwhPN1j1svqshyScB.Qa5l1G8M7hCPggzN5kvxrryoczR7xk0dZN307BGApquVaK8b9HkekRyrmEKgP/
+
+
+    # - name: Set authorized key without validating the TLS/SSL certificates
+    #   become: true
+    #   ansible.posix.authorized_key:
+    #     user: travis
+    #     state: present
+    #     key: https://github.com/tmichell13.keys
+    #     validate_certs: false
+
+
+    # - name: Add the user 'jim' 
+    #   become: true
+    #   ansible.builtin.user:
+    #     name: jim
+    #     shell: /bin/bash
+    #     append: yes
+    #     create_home: true
+    #     generate_ssh_key: true
+    #     groups: wheel, sudo
+    #     password: $6$E07OmrQ0YTNMssma$i2wXBTkwhPN1j1svqshyScB.Qa5l1G8M7hCPggzN5kvxrryoczR7xk0dZN307BGApquVaK8b9HkekRyrmEKgP/
+
+
+    # - name: Set authorized key without validating the TLS/SSL certificates
+    #   become: true
+    #   ansible.posix.authorized_key:
+    #     user: jim
+    #     state: present
+    #     key: https://github.com/ElwoodBermuda.keys
+    #     validate_certs: false
+
+
+    # - name: Add the user 'stevie' 
+    #   become: true
+    #   ansible.builtin.user:
+    #     name: stevie
+    #     shell: /bin/bash
+    #     append: yes
+    #     create_home: true
+    #     generate_ssh_key: true
+    #     groups: wheel, sudo
+    #     password: $6$E07OmrQ0YTNMssma$i2wXBTkwhPN1j1svqshyScB.Qa5l1G8M7hCPggzN5kvxrryoczR7xk0dZN307BGApquVaK8b9HkekRyrmEKgP/
+
+    # # do not set the authorized keys for them at this point
+    # - name: Set authorized key without validating the TLS/SSL certificates
+    #   become: true
+    #   ansible.posix.authorized_key:
+    #     user: stevie
+    #     state: present
+    #     key: https://github.com/????.keys
+    #     validate_certs: false
+
+    # - name: install docker
+    #   include_tasks: docker_install.yml
+
+
+    - name: install microk8s
+      include_tasks: microk8s_install.yml

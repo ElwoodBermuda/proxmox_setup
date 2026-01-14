@@ -1,0 +1,30 @@
+---
+- name: Install Argo CD on Kubernetes
+  hosts: microk8s
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create the 'argocd' namespace
+      kubernetes.core.k8s:
+        name: argocd
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Deploy Argo CD using the official manifest
+      kubernetes.core.k8s:
+        src: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+        state: present
+        namespace: argocd
+        wait: true # Ensures all resources are ready before proceeding
+
+    - name: Expose Argo CD Server as a LoadBalancer (optional, for cloud environments)
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Service
+        name: argocd-server
+        namespace: argocd
+        state: present
+        definition:
+          spec:
+            type: LoadBalancer
