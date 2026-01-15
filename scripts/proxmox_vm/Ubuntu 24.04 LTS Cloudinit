@@ -1,39 +1,44 @@
 # This is based of the guide at
 # https://static.xtremeownage.com/blog/2024/proxmox---debian-cloud-init-templates/
 
+# Install tools to manage images
+#apt-get install libguestfs-tools
+
+# Need to have already created the Template to attacht this to
+
 # The ID of the Template/VM.
-VM_ID=900
+VM_ID=901
 
 # Desired proxmox storage for the new image.
 STORAGE="ceph_vm_u2"
 
-# Download Image
-wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2
+# The Image to download
+IMAGE_FILE="noble-server-cloudimg-amd64.img"
 
-# Install tools to manage images
-apt-get install libguestfs-tools
+# Download Image
+wget https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img -O $IMAGE_FILE
 
 # Install packages
-virt-customize -a debian-12-genericcloud-amd64.qcow2 --install qemu-guest-agent,curl,wget,nano,rsync
+virt-customize -a $IMAGE_FILE --install qemu-guest-agent,curl,wget,nano,rsync,auto-apt-proxy
 
 # set to use aptcacher-ng proxy address
-#virt-customize -a debian-12-genericcloud-amd64.qcow2 --run-command 'echo "Acquire::http::Proxy \"http://172.29.10.26:3124/\";" > /etc/apt/apt.conf.d/99-proxy.conf'
+#virt-customize -a $IMAGE_FILE --run-command 'echo "Acquire::http::Proxy \"http://172.29.10.26:3124/\";" > /etc/apt/apt.conf.d/99-proxy.conf'
 
+## Below causes a problem as the file not found on a ubuntu image
 # Set the DHCP client identifier to use hardware address.
-virt-customize -a debian-12-genericcloud-amd64.qcow2 --run-command "sed -i 's|send host-name = gethostname();|send dhcp-client-identifier = hardware;|' /etc/dhcp/dhclient.conf"
+virt-customize -a $IMAGE_FILE --run-command "sed -i 's|send host-name = gethostname();|send dhcp-client-identifier = hardware;|' /etc/dhcp/dhclient.conf"
 
 # Reset Machine-ID
-virt-customize -a debian-12-genericcloud-amd64.qcow2 --run-command "echo -n > /etc/machine-id"
+virt-customize -a $IMAGE_FILE --run-command "echo -n > /etc/machine-id"
 
 # Compress the image
-qemu-img convert -O qcow2 -c -o preallocation=off debian-12-genericcloud-amd64.qcow2 debian-12-genericcloud-amd64-shrink.qcow2
-
+#qemu-img convert -O qcow2 -c -o preallocation=off $IMAGE_FILE debian-12-genericcloud-amd64-shrink.qcow2
 
 # Import the image to our template.
-qm importdisk $VM_ID debian-12-genericcloud-amd64-shrink.qcow2 $STORAGE
+qm importdisk $VM_ID $IMAGE_FILE $STORAGE
 
-qm clone 900 200 --name testclone --full
-qm start 200; qm terminal 200
+#qm clone 900 200 --name testclone --full
+#qm start 200; qm terminal 200
 
 #qm destroy 200
 

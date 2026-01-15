@@ -17,7 +17,6 @@ sudo snap install microk8s --classic
 microk8s enable ingress
 microk8s enable dashboard
 microk8s enable hostpath-storage
-microk8s enable cilium
 
 # enable Cillium
 #microk8s enable cilium

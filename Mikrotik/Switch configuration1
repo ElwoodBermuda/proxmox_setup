@@ -1,0 +1,108 @@
+
+add bridge=bridge comment=defconf frame-types=admit-only-untagged-and-priority-tagged interface=ether24 pvid=99
+
+/interface bridge port set [ find interface=ether9 ] frame-types=admit-only-vlan-tagged ingress-filtering=yes
+
+
+:foreach i in=[/interface list member find where list="LAN"] do={
+    :local ifaceName [/interface list member get $i interface];
+    /interface bridge port set [find interface=$ifaceName] pvid=10;
+}
+
+:foreach i in=[/interface find where name~"[0-9]\$"] do={
+    :local ifaceName [/interface get $i name];
+    :put "Found interface: $ifaceName";
+    # Add your logic here, e.g., move to a bridge
+    # /interface bridge port add bridge=bridge1 interface=$ifaceName
+}
+
+
+{
+    # Define the list of interface names in an array
+    :local ifaceList {"ether1";};
+
+    # Loop through each name in the list
+    :foreach ifaceName in=$ifaceList do={
+        # Set bridge port properties for each interface
+        /interface bridge port set [find interface=$ifaceName] pvid=10 frame-types=admit-only-untagged-and-priority-tagged;
+        
+        :put ("Updated bridge port: " . $ifaceName);
+    }
+}
+
+
+# Create a new list of Management interfaces
+/interface list
+add name=WAN
+add name=LAN
+add comment=management_vlan name=Management
+
+
+:foreach i in=[/interface list member find where list="Management"] do={
+    :local ifaceName [/interface list member get $i interface];
+    :put ("bridge port: " . $ifaceName);
+}
+
+# Add interfaces to the Management list
+{
+    :local listName "Management";
+    
+    # Loop from 9 to 16
+    :for i from=9 to=16 do={
+        :local ifaceName ("ether" . $i);
+        
+        # Check if the interface exists before adding
+        :if ([:len [/interface find name=$ifaceName]] > 0) do={
+            /interface list member add list=$listName interface=$ifaceName;
+            :put ("Added " . $ifaceName . " to " . $listName);
+        } else={
+            :put ("Warning: " . $ifaceName . " does not exist.");
+        }
+    }
+}
+
+# Make the Management list interfaces wb access ports on vlan 99
+:foreach i in=[/interface list member find where list="Management"] do={
+    :local ifaceName [/interface list member get $i interface];
+    /interface bridge port set [find interface=$ifaceName] frame-types=admit-only-untagged-and-priority-tagged pvid=99;
+}
+
+###########################Don't really like this as we don't want to set the bridge port to be in all VLANS
+# Make a port be a TRUNK (Add all VLANs to the port)
+/interface list add name=TrunkPorts
+/interface list member add list=TrunkPorts interface=ether17
+/interface bridge vlan add bridge=bridge1 vlan-ids=10 tagged=TrunkPorts
+
+# Add trunk ports to all VLANS
+{
+    :local listName "TrunkPorts";
+    
+    # Ensure the interface list exists before proceeding
+    :if ([:len [/interface list find name=$listName]] > 0) do={
+        :foreach i in=[/interface bridge vlan find] do={
+            # SET (overwrite) the tagged membership to only this list
+            /interface bridge vlan set $i tagged=$listName;
+        }
+        :put ("Successfully set all VLANs tagged ports to list: " . $listName);
+    } else={
+        :put ("Error: Interface list '" . $listName . "' not found.");
+    }
+}
+################################################
+
+#/interface bridge vlan set [find vlan-ids=10] tagged=sfp-sfpplus1-uplink,ether17
+
+/interface bridge vlan set [find vlan-ids=10] tagged=sfp-sfpplus1-uplink,TrunkPorts
+/interface bridge vlan set [find vlan-ids=20] tagged=sfp-sfpplus1-uplink,TrunkPorts
+/interface bridge vlan set [find vlan-ids=30] tagged=sfp-sfpplus1-uplink,TrunkPorts
+/interface bridge vlan set [find vlan-ids=40] tagged=sfp-sfpplus1-uplink,TrunkPorts
+/interface bridge vlan set [find vlan-ids=50] tagged=sfp-sfpplus1-uplink,TrunkPorts
+/interface bridge vlan set [find vlan-ids=99] tagged=bridge,sfp-sfpplus1-uplink,TrunkPorts
+
+
+/interface bridge vlan set bridge=bridge tagged=sfp-sfpplus1-uplink,ether17 vlan-ids=10
+/interface bridge vlan set bridge=bridge tagged=sfp-sfpplus1-uplink,ether17 vlan-ids=20
+/interface bridge vlan set bridge=bridge tagged=sfp-sfpplus1-uplink,ether17 vlan-ids=30
+/interface bridge vlan set bridge=bridge tagged=sfp-sfpplus1-uplink,ether17 vlan-ids=40
+/interface bridge vlan set bridge=bridge tagged=sfp-sfpplus1-uplink,ether17 vlan-ids=50
+/interface bridge vlan set bridge=bridge tagged=bridge,sfp-sfpplus1-uplink,ether17 vlan-ids=99

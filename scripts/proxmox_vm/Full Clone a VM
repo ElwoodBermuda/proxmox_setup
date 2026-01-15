@@ -1,1 +1,15 @@
 # Full Clone a VM
+# Since we have the template already ceated lets spin up 3 copies of MicroK8
+qm clone 901 200 --name mk8-01 --full ; qm set 200 --ipconfig0 ip=172.29.10.10/24,gw=172.29.10.254; qm resize 200 virtio0 +10G
+qm clone 901 201 --name mk8-02 --full ; qm set 201 --ipconfig0 ip=172.29.10.11/24,gw=172.29.10.254; qm resize 201 virtio0 +10G
+qm clone 901 202 --name mk8-03 --full ; qm set 202 --ipconfig0 ip=172.29.10.12/24,gw=172.29.10.254; qm resize 202 virtio0 +10G
+
+qm start 200; qm start 201; qm start 202
+qm stop 200; qm stop 201; qm stop 202
+qm destroy 200; qm destroy 201; qm destroy 202
+
+
+# Remove the local host key when we rebuild as this will cause SSH problems
+ssh-keygen -f "/home/jim/.ssh/known_hosts" -R "172.29.10.10"
+ssh-keygen -f "/home/jim/.ssh/known_hosts" -R "172.29.10.11"
+ssh-keygen -f "/home/jim/.ssh/known_hosts" -R "172.29.10.12"

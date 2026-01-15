@@ -32,7 +32,11 @@ qemu-img convert -O qcow2 -c -o preallocation=off debian-12-genericcloud-amd64.q
 # Import the image to our template.
 qm importdisk $VM_ID debian-12-genericcloud-amd64-shrink.qcow2 $STORAGE
 
-qm clone 900 200 --name testclone --full
+qm clone 900 200 --name mk8-01 --full; qm set 200 --ipconfig0 ip=172.29.10.10/24,gw=172.29.10.254
+qm clone 900 201 --name mk8-02 --full; qm set 201 --ipconfig0 ip=172.29.10.11/24,gw=172.29.10.254
+qm clone 900 202 --name mk8-03 --full; qm set 202 --ipconfig0 ip=172.29.10.12/24,gw=172.29.10.254
+
+
 qm start 200; qm terminal 200
 
 #qm destroy 200

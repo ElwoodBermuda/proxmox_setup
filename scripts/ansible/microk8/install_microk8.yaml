@@ -23,7 +23,11 @@
     - name: Add user to the microk8s group
       ansible.builtin.user:
         name: "{{ microk8s_user }}"
+        password: "$y$j9T$qrcfKcQ1sfspOtMbiHylY.$xtCC/dG/17paOWFW2qfpUOqWmBFaMlO1zHjA3LiDgj2"
         groups: microk8s
+        shell: /bin/bash
+        append: yes
+        create_home: true
         append: yes
 
     - name: Ensure .kube directory permissions are correct
@@ -46,7 +50,6 @@
       with_items:
         - dns
         - ingress
-        - cilium
         - dashboard
       register: enable_addons_result
       changed_when: enable_addons_result.rc != 0
@@ -95,9 +98,19 @@
       command: microk8s add-node --format short
       register: join_command_raw
 
+    - name: Print the captured command output
+      ansible.builtin.debug:
+        var: join_command_raw.stdout_lines
+
     - name: Set join command as a fact
       set_fact:
         join_command: "{{ join_command_raw.stdout_lines[0] }}"
+
+    - name: Print the captured command output
+      ansible.builtin.debug:
+        var: join_command_raw.stdout
+
+
 
 - name: Join Worker Nodes to Cluster
   hosts: workers
