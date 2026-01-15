@@ -1,0 +1,5 @@
+- name: Globally change https to http in a specific sources file
+  ansible.builtin.replace:
+    path: /etc/apt/sources.list.d/debian.sources
+    regexp: '^URIs: https://'
+    replace: 'URIs: http://'
