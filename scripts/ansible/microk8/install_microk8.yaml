@@ -20,15 +20,25 @@
         channel: "{{ microk8s_channel }}" # Uncomment to use a specific channel
         state: present
 
-    - name: Add user to the microk8s group
+    - name: Create and add user to the microk8s group
       ansible.builtin.user:
         name: "{{ microk8s_user }}"
         password: "$y$j9T$qrcfKcQ1sfspOtMbiHylY.$xtCC/dG/17paOWFW2qfpUOqWmBFaMlO1zHjA3LiDgj2"
-        groups: microk8s
+        groups: microk8s, sudo
         shell: /bin/bash
+        generate_ssh_key: true
         append: yes
         create_home: true
         append: yes
+
+    - name: Add client puplic key to user login
+      # How would I pass in this clients ssh public key to this script????
+      become: true
+      ansible.posix.authorized_key:
+        user: "{{ microk8s_user }}"
+        state: present
+        key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIONWlbcdFkB9i1Nwy+UykfYjnN4w1eDMsS8w7i287Iip"
+        
 
     - name: Ensure .kube directory permissions are correct
       ansible.builtin.file:
@@ -45,10 +55,19 @@
         # Prevents "changed" status if the ownership is already correct
         creates: /home/{{ microk8s_user }}/.kube/config 
 
+    - name: Set an alias for kubectl
+      ansible.builtin.shell: echo "alias kubectl='microk8s.kubectl'" >> /home/{{ microk8s_user }}/.bash_aliases
+      args:
+        creates: /home/{{ microk8s_user }}/.bash_aliases # Prevents running command multiple times
+
+
+    - name: Wait for MicroK8s to be ready
+      ansible.builtin.command: microk8s status --wait-ready
+      changed_when: false # This command checks status and waits, doesn't change system state in Ansible's view
+
     - name: Enable required MicroK8s add-ons (dns, storage, ingress)
       ansible.builtin.command: microk8s enable {{ item }}
       with_items:
-        - dns
         - ingress
         - dashboard
       register: enable_addons_result
@@ -56,14 +75,7 @@
       # Use `microk8s status --wait-ready` in a separate task or manual step after this to ensure
       # all components are running before attempting to deploy K8s resources.
 
-    - name: Set an alias for kubectl
-      ansible.builtin.shell: echo "alias kubectl='microk8s.kubectl'" >> /home/{{ microk8s_user }}/.bash_aliases
-      args:
-        creates: /home/{{ microk8s_user }}/.bash_aliases # Prevents running command multiple times
 
-    - name: Wait for MicroK8s to be ready
-      ansible.builtin.command: microk8s status --wait-ready
-      changed_when: false # This command checks status and waits, doesn't change system state in Ansible's view
 
 
     # # TODO: set the password for the user here
@@ -90,36 +102,43 @@
 
 
 
-- name: Configure Master and Generate Join Command
-  hosts: master
-  become: true
-  tasks:
-    - name: Generate join token
-      command: microk8s add-node --format short
-      register: join_command_raw
+# - name: Configure Master and Generate Join Command
+#   hosts: master
+#   become: true
+#   tasks:
+#     - name: Generate join token
+#       command: microk8s add-node --format short
+#       register: join_command_raw
 
-    - name: Print the captured command output
-      ansible.builtin.debug:
-        var: join_command_raw.stdout_lines
+#     - name: Print the captured command output
+#       ansible.builtin.debug:
+#         var: join_command_raw.stdout_lines
 
-    - name: Set join command as a fact
-      set_fact:
-        join_command: "{{ join_command_raw.stdout_lines[0] }}"
+#     - name: Set join command as a fact
+#       set_fact:
+#         join_command: "{{ join_command_raw.stdout_lines[0] }}"
 
-    - name: Print the captured command output
-      ansible.builtin.debug:
-        var: join_command_raw.stdout
+#     - name: Print the captured command output
+#       ansible.builtin.debug:
+#         var: join_command_raw.stdout
 
 
 
-- name: Join Worker Nodes to Cluster
-  hosts: workers
-  become: true
-  tasks:
-    - name: Join the cluster
-      command: "{{ hostvars[groups['master'][0]]['join_command'] }}"
-      register: join_result
-      failed_when: 
-        - join_result.rc != 0 
-        - "'already part of a cluster' not in join_result.stderr"
+# - name: Join Worker Nodes to Cluster
+#   hosts: workers
+#   become: true
+#   tasks:
+#     - name: Join the cluster
+#       command: "{{ hostvars[groups['master'][0]]['join_command'] }}"
+#       register: join_result
+#       failed_when: 
+#         - join_result.rc != 0 
+#         - "'already part of a cluster' not in join_result.stderr"
 
+# After join we will want to enable the metallb
+#microk8s enable metallb:192.168.1.200-192.168.1.220
+
+# Patch the dashboard proxy service to use a metalIP
+#microk8s kubectl patch svc kubernetes-dashboard-kong-proxy -n kubernetes-dashboard -p '{"spec": {"type": "LoadBalancer"}}'
+# get a token
+#microk8s kubectl create token default -n kube-system
