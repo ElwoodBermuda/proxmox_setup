@@ -15,7 +15,12 @@ sudo snap install microk8s --classic
 # enable hostpath, ingress, and dashboard 
 
 microk8s enable ingress
-microk8s enable dashboard
+-- get spelling right microk8s enable argocd
+-- get spelling right microk8s enable promethius
+-- get spelling right microk8s enable metallb
+-- get spelling right microk8s enable traefik
+
+
 microk8s enable hostpath-storage
 
 # enable Cillium
