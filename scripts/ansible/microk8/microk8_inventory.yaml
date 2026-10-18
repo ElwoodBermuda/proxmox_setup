@@ -13,5 +13,6 @@ microk8s:
   vars:
     # Global variables for all nodes in the cluster
     ansible_user: "temp"
+    ansible_user: "kubeuser"
     # ansible_password: "temp"
     # microk8s_version: "1.32/stable"

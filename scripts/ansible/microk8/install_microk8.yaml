@@ -13,6 +13,12 @@
         update_cache: yes
         cache_valid_time: 3600
 
+    - name: Install pip for Ubuntu/Debian
+      ansible.builtin.apt:
+        name: python3-pip, python3-kubernetes
+        state: present
+        update_cache: yes
+
     - name: Install MicroK8s via snap
       community.general.snap: # The snap module is in the community.general collection
         name: microk8s
@@ -70,6 +76,7 @@
       with_items:
         - ingress
         - dashboard
+        - hostpath-storage
       register: enable_addons_result
       changed_when: enable_addons_result.rc != 0
       # Use `microk8s status --wait-ready` in a separate task or manual step after this to ensure

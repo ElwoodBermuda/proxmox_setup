@@ -1,9 +1,38 @@
 ---
 - name: Install Argo CD on Kubernetes
-  hosts: microk8s
-  connection: local
+  hosts: master
   gather_facts: false
   tasks:
+
+    # - name: Ensure kubernetes python library is installed
+    #   ansible.builtin.pip:
+    #     name: 
+    #       - kubernetes
+    #       - PyYAML
+    #     executable: pip3.12
+    #   become: true
+
+    # - name: Install the kubernetes python library
+    #   ansible.builtin.pip:
+    #     name: kubernetes
+    #     executable: pip3.12  # Explicitly use the pip version for Python 3.12
+    #   become: true
+
+    # - name: Get pods using MicroK8s config
+    #   kubernetes.core.k8s_info:
+    #     kind: Pod
+    #     kubeconfig: /var/snap/microk8s/current/credentials/client.config
+    #   become: true  # Required to read the protected snap directory
+
+    # - name: Export MicroK8s config to user's home
+    #   ansible.builtin.shell: |
+    #     mkdir -p {{ ansible_env.HOME }}/.kube
+    #     microk8s config > {{ ansible_env.HOME }}/.kube/config
+    #     chmod 600 {{ ansible_env.HOME }}/.kube/config
+    #   become: true
+    #   args:
+    #     creates: "{{ ansible_env.HOME }}/.kube/config"
+
     - name: Create the 'argocd' namespace
       kubernetes.core.k8s:
         name: argocd
